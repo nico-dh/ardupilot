@@ -1581,6 +1581,15 @@ bool NavEKF3::using_extnav_for_yaw() const
     return core[primary].using_extnav_for_yaw();
 }
 
+// are we currently using GPS to estimate position or velocity?
+bool NavEKF3::using_gps() const
+{
+    if (!core) {
+        return false;
+    }
+    return core[primary].using_gps();
+}
+
 // check if configured to use GPS for horizontal position estimation
 bool NavEKF3::configuredToUseGPSForPosXY(void) const
 {

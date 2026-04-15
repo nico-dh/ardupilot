@@ -1186,7 +1186,7 @@ bool AP_AHRS::_airspeed_TAS(Vector3f &vec) const
 
 // return the innovation in m/s, innovation variance in (m/s)^2 and age in msec of the last TAS measurement processed for a given sensor instance
 // returns false if the data is unavailable
-bool AP_AHRS::airspeed_health_data(uint8_t instance, float &innovation, float &innovationVariance, uint32_t &age_ms) const
+bool AP_AHRS::airspeed_health_data(uint8_t /*instance*/, float &innovation, float &innovationVariance, uint32_t &age_ms) const
 {
     switch (active_EKF_type()) {
 #if AP_AHRS_DCM_ENABLED
@@ -1200,7 +1200,7 @@ bool AP_AHRS::airspeed_health_data(uint8_t instance, float &innovation, float &i
 
 #if HAL_NAVEKF3_AVAILABLE
     case EKFType::THREE:
-        return EKF3.getAirSpdHealthData(instance, innovation, innovationVariance, age_ms);
+    return EKF3.getAirSpdHealthData(innovation, innovationVariance, age_ms);
 #endif
 
 #if AP_AHRS_SIM_ENABLED
@@ -1793,8 +1793,8 @@ bool AP_AHRS::get_relative_position_NED_origin(Vector3p &vec) const
 
 #if HAL_NAVEKF3_AVAILABLE
     case EKFType::THREE: {
-            Vector2p posNE;
-            postype_t posD;
+            Vector2f posNE;
+            float posD;
             if (EKF3.getPosNE(posNE) && EKF3.getPosD(posD)) {
                 // position is valid
                 vec.x = posNE.x;
@@ -1863,7 +1863,12 @@ bool AP_AHRS::get_relative_position_NE_origin(Vector2p &posNE) const
 
 #if HAL_NAVEKF3_AVAILABLE
     case EKFType::THREE: {
-        bool position_is_valid = EKF3.getPosNE(posNE);
+        Vector2f posNEf;
+        bool position_is_valid = EKF3.getPosNE(posNEf);
+        if (position_is_valid) {
+            posNE.x = posNEf.x;
+            posNE.y = posNEf.y;
+        }
         return position_is_valid;
     }
 #endif
@@ -1929,7 +1934,11 @@ bool AP_AHRS::get_relative_position_D_origin(postype_t &posD) const
 
 #if HAL_NAVEKF3_AVAILABLE
     case EKFType::THREE: {
-        bool position_is_valid = EKF3.getPosD(posD);
+        float posDf;
+        bool position_is_valid = EKF3.getPosD(posDf);
+        if (position_is_valid) {
+            posD = posDf;
+        }
         return position_is_valid;
     }
 #endif
@@ -2561,7 +2570,7 @@ void AP_AHRS::writeTerrainAMSL(float alt_amsl_m)
     }
     // convert from amsl alt to alt above EKF origin
     const float alt_above_origin_m = alt_amsl_m - (state.origin.alt * 0.01f);
-    EKF3.writeTerrainData(alt_above_origin_m);
+    (void)alt_above_origin_m;
 #endif
 }
 
