@@ -368,6 +368,16 @@ public:
     // get a yaw estimator instance
     const EKFGSF_yaw *get_yawEstimator(void) const;
 
+    // enum for processing options (public alias)
+    enum class Option {
+        JammingExpected = (1<<0),
+    };
+
+    // check if a processing option is enabled
+    bool option_is_enabled(Option opt) const {
+        return (_options & (int32_t)opt) != 0;
+    }
+
 private:
     class AP_DAL &dal;
 

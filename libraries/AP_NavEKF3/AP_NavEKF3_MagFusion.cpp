@@ -836,6 +836,7 @@ void NavEKF3_core::FuseMagnetometer()
         // correct the covariance P = (I - K*H)*P
         // take advantage of the empty columns in KH to reduce the
         // number of operations
+        ftype KH[24][24];
         for (unsigned i = 0; i<=stateIndexLim; i++) {
             for (unsigned j = 0; j<=3; j++) {
                 KH[i][j] = Kfusion[i] * H_MAG[j];
@@ -1199,6 +1200,7 @@ bool NavEKF3_core::fuseEulerYaw(yawFusionMethod method)
 
     // correct the covariance using P = P - K*H*P taking advantage of the fact that only the first 3 elements in H are non zero
     // calculate K*H*P
+    ftype KH[24][24];
     for (uint8_t row = 0; row <= stateIndexLim; row++) {
         for (uint8_t column = 0; column <= 3; column++) {
             KH[row][column] = Kfusion[row] * H_YAW[column];
@@ -1381,6 +1383,7 @@ void NavEKF3_core::FuseDeclination(ftype declErr)
     // correct the covariance P = (I - K*H)*P
     // take advantage of the empty columns in KH to reduce the
     // number of operations
+    ftype KH[24][24];
     for (unsigned i = 0; i<=stateIndexLim; i++) {
         for (unsigned j = 0; j<=15; j++) {
             KH[i][j] = 0.0f;
