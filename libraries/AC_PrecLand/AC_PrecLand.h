@@ -129,6 +129,18 @@ public:
     */
     bool get_target_velocity(Vector2f& ret);
 
+    /*
+      get the heading (front direction) of the landing target in NED frame.
+      This requires the companion computer to populate the orientation quaternion (q)
+      field of the LANDING_TARGET message (rotation from vehicle body frame to target frame)
+      returns false if the target orientation is unknown or stale
+    */
+    bool get_target_heading_ned_rad(float &heading_rad) const;
+
+    // landing target yaw alignment (PLND_YAW_TGT) parameter getters
+    bool get_yaw_tgt_enabled() const { return _yaw_tgt_enabled.get() != 0; }
+    float get_yaw_tgt_rate_degs() const { return _yaw_tgt_rate_degs; }
+
     // parameter var table
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -213,6 +225,8 @@ private:
     AP_Float                    _sensor_max_alt_m;      // PrecLand maximum height the sensor can detect target
     AP_Int16                    _options;               // Bitmask for extra options
     AP_Enum<Rotation>           _orient;                // Orientation of camera/sensor
+    AP_Int8                     _yaw_tgt_enabled;        // Align vehicle heading with landing target orientation during precision landing
+    AP_Float                    _yaw_tgt_rate_degs;      // maximum slew rate (deg/s) for landing target yaw alignment
 
     uint32_t                    _last_update_ms;            // system time in millisecond when update was last called
     bool                        _target_acquired;           // true if target has been seen recently after estimator is initialized

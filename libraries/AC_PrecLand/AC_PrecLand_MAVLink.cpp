@@ -49,6 +49,19 @@ void AC_PrecLand_MAVLink::handle_msg(const mavlink_landing_target_t &packet, uin
     _distance_to_target = MAX(0, packet.distance);
     _los_meas.time_ms = timestamp_ms;
     _los_meas.valid = true;
+
+    // parse the target orientation. The quaternion (w, x, y, z) is the rotation from
+    // the vehicle body frame to the target frame, NaN if the orientation is unknown
+    _target_att.time_ms = timestamp_ms;
+    if (isfinite(packet.q[0]) && isfinite(packet.q[1]) && isfinite(packet.q[2]) && isfinite(packet.q[3]) &&
+        !(is_zero(packet.q[0]) && is_zero(packet.q[1]) && is_zero(packet.q[2]) && is_zero(packet.q[3]))) {
+        _target_att.att = Quaternion{packet.q[0], packet.q[1], packet.q[2], packet.q[3]};
+        _target_att.att.normalize();
+        _target_att.valid = true;
+    } else {
+        // an unknown orientation clears any previously received orientation
+        _target_att.valid = false;
+    }
 }
 
 #endif // AC_PRECLAND_MAVLINK_ENABLED

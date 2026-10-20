@@ -247,6 +247,14 @@ protected:
     // Run precland statemachine. This function should be called from any mode that wants to do precision landing.
     // This handles everything from prec landing, to prec landing failures, to retries and failsafe measures
     void precland_run();
+
+    // adjust the yaw heading command to align the vehicle heading (front) with the
+    // landing target orientation when PLND_YAW_TGT is enabled
+    AC_AttitudeControl::HeadingCommand precland_adjust_yaw_heading(const AC_AttitudeControl::HeadingCommand &heading);
+
+    // landing target yaw alignment state
+    float _precland_yaw_target_rad{};
+    bool _precland_yaw_target_valid = false;
 #endif
 
     // return expected input throttle setting to hover:

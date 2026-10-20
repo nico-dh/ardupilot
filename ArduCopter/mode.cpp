@@ -851,7 +851,11 @@ void Mode::land_run_horizontal_control()
     Vector3f thrust_vector = pos_control->get_thrust_vector();
 
     // call attitude controller
-    attitude_control->input_thrust_vector_heading(thrust_vector, auto_yaw.get_heading());
+    AC_AttitudeControl::HeadingCommand heading = auto_yaw.get_heading();
+#if AC_PRECLAND_ENABLED
+    heading = precland_adjust_yaw_heading(heading);
+#endif
+    attitude_control->input_thrust_vector_heading(thrust_vector, heading);
 
 }
 
@@ -960,6 +964,53 @@ void Mode::precland_run()
         // just land, since user has taken over controls, it does not make sense to run any retries or failsafe measures
         land_run_horiz_and_vert_control();
     }
+}
+
+// adjust the yaw heading command so the vehicle aligns its heading (front) with the
+// landing target orientation. Used during the landing stage of LAND, AUTO (NAV_LAND)
+// and RTL. The target heading is slewed towards at a limited rate (PLND_TGT_RATE)
+// and, once the target is no longer visible (eg. very close to the ground), the last
+// known target heading is held
+AC_AttitudeControl::HeadingCommand Mode::precland_adjust_yaw_heading(const AC_AttitudeControl::HeadingCommand &heading)
+{
+    // clear state whenever precision landing is not active (target lost, retry, failsafe)
+    if (!copter.ap.prec_land_active) {
+        _precland_yaw_target_valid = false;
+        return heading;
+    }
+
+    // only when enabled and the pilot is not actively yawing the vehicle
+    if (!copter.precland.get_yaw_tgt_enabled() || auto_yaw.mode() == AutoYaw::Mode::PILOT_RATE) {
+        // keep our target heading in sync with the vehicle while the pilot is yawing
+        if (auto_yaw.mode() == AutoYaw::Mode::PILOT_RATE && _precland_yaw_target_valid) {
+            _precland_yaw_target_rad = copter.ahrs.get_yaw_rad();
+        }
+        return heading;
+    }
+
+    float target_heading_rad;
+    if (copter.precland.get_target_heading_ned_rad(target_heading_rad)) {
+        if (!_precland_yaw_target_valid) {
+            // seed the target with the current vehicle heading so the slew is continuous
+            _precland_yaw_target_rad = copter.ahrs.get_yaw_rad();
+            _precland_yaw_target_valid = true;
+        }
+        // slew the target heading towards the landing target orientation at a limited rate
+        const float max_slew_rad = MAX(radians(copter.precland.get_yaw_tgt_rate_degs()), 0.0f) * G_Dt;
+        const float yaw_error_rad = wrap_PI(target_heading_rad - _precland_yaw_target_rad);
+        _precland_yaw_target_rad = wrap_PI(_precland_yaw_target_rad + constrain_float(yaw_error_rad, -max_slew_rad, max_slew_rad));
+    } else if (!_precland_yaw_target_valid) {
+        // never had the target orientation, hold the normal heading
+        return heading;
+    }
+
+    // command the rate limited heading. If the target orientation is lost
+    // (eg. very close to the ground) the last known target heading is held
+    AC_AttitudeControl::HeadingCommand new_heading = heading;
+    new_heading.yaw_angle_rad = _precland_yaw_target_rad;
+    new_heading.yaw_rate_rads = 0.0f;
+    new_heading.heading_mode = AC_AttitudeControl::HeadingMode::Angle_And_Rate;
+    return new_heading;
 }
 #endif
 

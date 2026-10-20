@@ -28,6 +28,7 @@ static const uint32_t EKF_INIT_SENSOR_MIN_UPDATE_MS = 500; // Sensor must update
 static const uint32_t LANDING_TARGET_TIMEOUT_MS = 2000; // Sensor must update within this many ms, else prec landing will be switched off
 static const uint32_t LANDING_TARGET_LOST_TIMEOUT_MS = 180000; // Target will be considered as "lost" if the last known location of the target is more than this many ms ago
 static const float    LANDING_TARGET_LOST_DIST_THRESH_M  = 30; // If the last known location of the landing target is beyond this many meters, then we will consider it lost
+static const uint32_t LANDING_TARGET_ATT_TIMEOUT_MS = 1000; // Target orientation must update within this many ms, else the orientation is considered stale
 
 const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
     // @Param: ENABLED
@@ -189,6 +190,22 @@ const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
     // @User: Advanced
     // @RebootRequired: True
     AP_GROUPINFO_FRAME("ORIENT", 18, AC_PrecLand, _orient, AC_PRECLAND_ORIENT_DEFAULT, AP_PARAM_FRAME_ROVER), 
+
+    // @Param: YAW_TGT
+    // @DisplayName: Landing target yaw alignment
+    // @Description: Align the vehicle heading (front) with the landing target orientation while precision landing. Requires the companion computer to populate the orientation quaternion (q) field of the LANDING_TARGET message (rotation from body frame to target frame). The target is slewed towards at a limited rate (see PLND_TGT_RATE) and the last known target heading is held once the target is no longer visible.
+    // @Values: 0:Disabled, 1:Enabled
+    // @User: Advanced
+    AP_GROUPINFO("YAW_TGT", 19, AC_PrecLand, _yaw_tgt_enabled, 0),
+
+    // @Param: TGT_RATE
+    // @DisplayName: Landing target yaw alignment slew rate
+    // @Description: Maximum rate at which the vehicle heading is slewed towards the landing target orientation during precision landing
+    // @Units: deg/s
+    // @Range: 5 90
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("TGT_RATE", 20, AC_PrecLand, _yaw_tgt_rate_degs, 20),
 
     AP_GROUPEND
 };
@@ -807,6 +824,36 @@ bool AC_PrecLand::get_target_velocity(Vector2f& target_vel)
     }
     // return the absolute velocity
     target_vel = (target_vel_rel_ne_ms) + _last_veh_velocity_NED_ms.xy();
+    return true;
+}
+
+// get the heading (front direction) of the landing target in NED frame
+// the target orientation quaternion (received from the companion computer) is the
+// rotation from the vehicle body frame to the target frame, so the target x-axis is
+// the front direction of the target
+bool AC_PrecLand::get_target_heading_ned_rad(float &heading_rad) const
+{
+    // exit immediately if we do not have a backend
+    if (_backend == nullptr) {
+        return false;
+    }
+
+    Quaternion q;
+    uint32_t timestamp_ms;
+    if (!_backend->get_target_att(q, timestamp_ms)) {
+        return false;
+    }
+
+    // ignore stale target orientation
+    if (AP_HAL::millis() - timestamp_ms > LANDING_TARGET_ATT_TIMEOUT_MS) {
+        return false;
+    }
+
+    // calculate the target front direction in body frame (rotate the target x-axis
+    // by the inverse of the body to target rotation) and rotate it into NED
+    const Vector3f front_body = q.inverse() * Vector3f{1.0f, 0.0f, 0.0f};
+    const Vector3f front_ned = AP::ahrs().get_rotation_body_to_ned() * front_body;
+    heading_rad = atan2f(front_ned.y, front_ned.x);
     return true;
 }
 

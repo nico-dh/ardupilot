@@ -15,7 +15,12 @@ public:
     // Constructor
     AC_PrecLand_Backend(const AC_PrecLand& frontend, AC_PrecLand::precland_state& state) :
         _frontend(frontend),
-        _state(state) {}
+        _state(state)
+    {
+        // default target orientation to unknown
+        _target_att.valid = false;
+        _target_att.time_ms = 0;
+    }
 
     // destructor
     virtual ~AC_PrecLand_Backend() {}
@@ -34,6 +39,17 @@ public:
         }
         vec_unit = _los_meas.vec_unit;
         frame = _los_meas.frame;
+        return true;
+    };
+
+    // get the target orientation (rotation from vehicle body frame to target frame)
+    // returns true when a valid target orientation is available
+    bool get_target_att(Quaternion &q, uint32_t &time_ms) const {
+        if (!_target_att.valid) {
+            return false;
+        }
+        q = _target_att.att;
+        time_ms = _target_att.time_ms;
         return true;
     };
 
@@ -59,6 +75,11 @@ protected:
         uint32_t time_ms;   // system time in milliseconds when the vector was measured
         bool valid;         // true if there is a valid measurement from the sensor
     } _los_meas;
+    struct {
+        Quaternion att;     // rotation from vehicle body frame to target frame
+        uint32_t time_ms;   // system time in milliseconds of the measurement
+        bool valid;         // true if there is a valid target orientation from the sensor
+    } _target_att;
     float               _distance_to_target;    // distance from the sensor to landing target in meters
 };
 
